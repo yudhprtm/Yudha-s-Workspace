@@ -7,7 +7,10 @@ const clockIn = async (req, res, next) => {
 
         // Get employee ID
         const employee = await db.get("SELECT id FROM employees WHERE user_id = ?", [userId]);
-        if (!employee) return res.status(404).json({ error: 'Employee profile not found' });
+        if (!employee) {
+            console.error(`Employee profile not found for user ${userId}`);
+            return res.status(404).json({ error: 'Employee profile not found. Please contact HR.' });
+        }
 
         // Check if already clocked in today without clock out
         const today = new Date().toISOString().split('T')[0];
@@ -94,4 +97,36 @@ const getMonthly = async (req, res, next) => {
     }
 };
 
-module.exports = { clockIn, clockOut, getMonthly };
+const getRecent = async (req, res, next) => {
+    try {
+        const db = await getDb();
+        const userId = req.user.id;
+
+        // Default to current month
+        const now = new Date();
+        const month = now.toISOString().slice(0, 7); // YYYY-MM
+
+        let sql = `SELECT a.*, e.nik, u.name 
+                   FROM attendance a 
+                   JOIN employees e ON a.employee_id = e.id 
+                   JOIN users u ON e.user_id = u.id 
+                   WHERE a.tenant_id = ? AND strftime('%Y-%m', a.clock_in) = ?`;
+        const params = [req.tenantId, month];
+
+        if (req.user.role === 'EMPLOYEE') {
+            const employee = await db.get("SELECT id FROM employees WHERE user_id = ?", [userId]);
+            if (!employee) return res.json([]); // Return empty if no profile
+            sql += " AND a.employee_id = ?";
+            params.push(employee.id);
+        }
+
+        sql += " ORDER BY a.clock_in DESC";
+
+        const records = await db.all(sql, params);
+        res.json(records);
+    } catch (err) {
+        next(err);
+    }
+};
+
+module.exports = { clockIn, clockOut, getMonthly, getRecent };

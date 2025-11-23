@@ -9,5 +9,6 @@ router.use(checkTenant);
 router.post('/clock-in', attendanceController.clockIn);
 router.post('/clock-out', attendanceController.clockOut);
 router.get('/monthly', attendanceController.getMonthly);
+router.get('/', attendanceController.getRecent);
 
 module.exports = router;

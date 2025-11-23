@@ -1,7 +1,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
-import axios from 'axios';
+import api from '../services/api';
 
 const Layout = ({ children }) => {
     const navigate = useNavigate();
@@ -14,7 +14,7 @@ const Layout = ({ children }) => {
 
     const fetchNotifications = async () => {
         try {
-            const { data } = await axios.get(`/api/${user.tenantId}/notifications`);
+            const { data } = await api.get(`/api/${user.tenantId}/notifications`);
             setNotifications(data);
         } catch (err) {
             console.error(err);
@@ -29,7 +29,7 @@ const Layout = ({ children }) => {
 
     const markRead = async (id) => {
         try {
-            await axios.patch(`/api/${user.tenantId}/notifications/${id}/read`);
+            await api.patch(`/api/${user.tenantId}/notifications/${id}/read`);
             setNotifications(prev => prev.filter(n => n.id !== id));
         } catch (err) {
             console.error(err);
