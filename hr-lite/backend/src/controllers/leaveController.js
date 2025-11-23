@@ -1,4 +1,5 @@
 const { getDb } = require('../services/db');
+const { createNotification, logApproval } = require('../services/approvalService');
 
 const requestLeave = async (req, res, next) => {
     try {
@@ -28,7 +29,13 @@ const requestLeave = async (req, res, next) => {
             [req.tenantId, employee.id, type, start_date, end_date, days, reason]
         );
 
-        res.status(201).json({ id: result.lastID, status: 'pending' });
+        let newId = result.lastID;
+        if (!newId) {
+            const row = await db.get("SELECT last_insert_rowid() as id");
+            newId = row.id;
+        }
+
+        res.status(201).json({ id: newId, status: 'pending' });
     } catch (err) {
         next(err);
     }
@@ -39,14 +46,24 @@ const updateStatus = async (req, res, next) => {
         const { status } = req.body; // approved, rejected
         const { id } = req.params;
         const approverId = req.user.id;
+        const db = await getDb();
 
         if (!['approved', 'rejected'].includes(status)) return res.status(400).json({ error: 'Invalid status' });
 
-        const db = await getDb();
+        const leave = await db.get("SELECT * FROM leave_requests WHERE id = ? AND tenant_id = ?", [id, req.tenantId]);
+        if (!leave) return res.status(404).json({ error: 'Leave request not found' });
+
+        if (leave.status !== 'pending') {
+            return res.status(400).json({ error: 'Leave request is already processed' });
+        }
+
         await db.run(
             "UPDATE leave_requests SET status = ?, approver_id = ? WHERE id = ? AND tenant_id = ?",
             [status, approverId, id, req.tenantId]
         );
+
+        await logApproval(req.tenantId, 'LEAVE', id, status.toUpperCase(), approverId, req.body.comment);
+        await createNotification(req.tenantId, leave.employee_id, 'LEAVE_STATUS', `Your leave request was ${status}`, { leave_id: id });
 
         res.json({ status });
     } catch (err) {
@@ -77,4 +94,14 @@ const list = async (req, res, next) => {
     }
 };
 
-module.exports = { requestLeave, updateStatus, list };
+const approve = (req, res, next) => {
+    req.body.status = 'approved';
+    updateStatus(req, res, next);
+};
+
+const reject = (req, res, next) => {
+    req.body.status = 'rejected';
+    updateStatus(req, res, next);
+};
+
+module.exports = { requestLeave, updateStatus, list, approve, reject };

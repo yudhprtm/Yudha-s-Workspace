@@ -37,8 +37,9 @@ const Leave = () => {
 
     const handleStatus = async (id, status) => {
         try {
+            // status is 'approve' or 'reject'
             await api.patch(`/api/${tenantId}/leave/${id}/${status}`);
-            addToast(`Leave request ${status}`, 'success');
+            addToast(`Leave request ${status}d`, 'success');
             fetchLeaves();
         } catch (err) {
             addToast('Action failed', 'error');

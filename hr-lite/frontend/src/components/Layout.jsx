@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import axios from 'axios';
 
 const Layout = ({ children }) => {
     const navigate = useNavigate();
@@ -8,6 +9,32 @@ const Layout = ({ children }) => {
     const user = JSON.parse(atob(localStorage.getItem('token').split('.')[1]));
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { theme, toggleTheme } = useTheme();
+    const [notifications, setNotifications] = useState([]);
+    const [showNotifications, setShowNotifications] = useState(false);
+
+    const fetchNotifications = async () => {
+        try {
+            const { data } = await axios.get(`/api/${user.tenantId}/notifications`);
+            setNotifications(data);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    useEffect(() => {
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
+        return () => clearInterval(interval);
+    }, []);
+
+    const markRead = async (id) => {
+        try {
+            await axios.patch(`/api/${user.tenantId}/notifications/${id}/read`);
+            setNotifications(prev => prev.filter(n => n.id !== id));
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     const logout = () => {
         localStorage.removeItem('token');
@@ -24,26 +51,47 @@ const Layout = ({ children }) => {
     };
 
     const navItems = [
-        { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-        { path: '/employees', label: 'Employees', icon: '👥' },
-        { path: '/attendance', label: 'Attendance', icon: '🕒' },
-        { path: '/leave', label: 'Leave', icon: '📅' },
-        { path: '/payroll', label: 'Payroll', icon: '💰' },
-        ...(user.role === 'ADMIN' ? [{ path: '/admin', label: 'Admin', icon: '⚙️' }] : [])
-    ];
+        { path: '/dashboard', label: 'Dashboard', icon: '📊', roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] },
+        { path: '/employees', label: 'Employees', icon: '👥', roles: ['ADMIN', 'HR', 'MANAGER'] },
+        { path: '/attendance', label: 'Attendance', icon: '🕒', roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] },
+        { path: '/leave', label: 'Leave', icon: '📅', roles: ['ADMIN', 'HR', 'MANAGER', 'EMPLOYEE'] },
+        { path: '/payroll', label: 'Payroll', icon: '💰', roles: ['ADMIN', 'HR'] },
+        { path: '/admin', label: 'Admin', icon: '⚙️', roles: ['ADMIN'] }
+    ].filter(item => item.roles.includes(user.role));
 
     return (
         <div className="layout">
             {/* Mobile Header */}
             <div className="mobile-header">
-                <button onClick={toggleSidebar} className="menu-btn">
-                    ☰
-                </button>
+                <button onClick={toggleSidebar} className="menu-btn">☰</button>
                 <span className="brand-logo" style={{ fontSize: '1.2rem' }}>HR Lite</span>
-                <button onClick={toggleTheme} className="theme-toggle" style={{ width: '32px', height: '32px', fontSize: '1rem' }}>
-                    {theme === 'dark' ? '☀️' : '🌙'}
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={() => setShowNotifications(!showNotifications)} className="theme-toggle" style={{ position: 'relative' }}>
+                        🔔
+                        {notifications.length > 0 && <span style={{ position: 'absolute', top: -5, right: -5, background: 'red', color: 'white', borderRadius: '50%', padding: '2px 6px', fontSize: '10px' }}>{notifications.length}</span>}
+                    </button>
+                    <button onClick={toggleTheme} className="theme-toggle">
+                        {theme === 'dark' ? '☀️' : '🌙'}
+                    </button>
+                </div>
             </div>
+
+            {/* Notifications Dropdown (Simplified) */}
+            {showNotifications && (
+                <div style={{ position: 'fixed', top: '60px', right: '20px', width: '300px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '10px', zIndex: 100, boxShadow: 'var(--shadow-lg)' }}>
+                    <h4 style={{ marginBottom: '10px', borderBottom: '1px solid var(--border)', paddingBottom: '5px' }}>Notifications</h4>
+                    {notifications.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No new notifications</p> : (
+                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                            {notifications.map(n => (
+                                <div key={n.id} style={{ padding: '8px', borderBottom: '1px solid var(--border)', fontSize: '0.9rem' }}>
+                                    <p style={{ margin: 0 }}>{n.message}</p>
+                                    <button onClick={() => markRead(n.id)} style={{ fontSize: '0.8rem', color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: '5px' }}>Mark as read</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Overlay for mobile */}
             {isSidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}

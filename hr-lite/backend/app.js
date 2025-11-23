@@ -9,12 +9,13 @@ const employeeRoutes = require('./src/routes/employee');
 const attendanceRoutes = require('./src/routes/attendance');
 const leaveRoutes = require('./src/routes/leave');
 const payrollRoutes = require('./src/routes/payroll');
-const adminRoutes = require('./src/routes/admin');
+const notificationRoutes = require('./src/routes/notifications');
+const correctionRoutes = require('./src/routes/correction');
 
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Support base64 uploads
+app.use(express.json({ limit: (process.env.MAX_UPLOAD_SIZE_MB || 2) + 'mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 
@@ -25,18 +26,11 @@ app.use('/storage', express.static(path.join(__dirname, 'storage')));
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/:tenant/employees', employeeRoutes);
+app.use('/api/:tenant/attendance/corrections', correctionRoutes);
 app.use('/api/:tenant/attendance', attendanceRoutes);
 app.use('/api/:tenant/leave', leaveRoutes);
 app.use('/api/:tenant/payroll', payrollRoutes);
-app.use('/admin', adminRoutes);
-
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', uptime: process.uptime() });
-});
-
-// Error Handler
-app.use(errorHandler);
+app.use('/api/:tenant/notifications', notificationRoutes);
 
 const PORT = process.env.PORT || 3000;
 

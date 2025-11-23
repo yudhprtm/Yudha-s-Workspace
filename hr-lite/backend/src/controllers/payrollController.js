@@ -1,51 +1,77 @@
 const { getDb } = require('../services/db');
+const { createNotification, logApproval } = require('../services/approvalService');
 
-const create = async (req, res, next) => {
+const createDraft = async (req, res, next) => {
     try {
-        const { employee_id, period_start, period_end, base_salary, allowances, deductions } = req.body;
+        const { period, employee_ids } = req.body; // e.g. "2023-11", [1, 2, 3]
         const db = await getDb();
 
-        // Check if employee exists
-        const employee = await db.get("SELECT id FROM employees WHERE id = ? AND tenant_id = ?", [employee_id, req.tenantId]);
-        if (!employee) return res.status(404).json({ error: 'Employee not found' });
-
-        // Get configured salary if not provided
-        let salaryConfig = await db.get("SELECT * FROM salaries WHERE employee_id = ?", [employee_id]);
-
-        // N10: Missing salary record
-        if (!salaryConfig && !base_salary) {
-            return res.status(422).json({ error: 'Salary not found for employee' });
-        }
-
-        const finalBase = base_salary !== undefined ? base_salary : salaryConfig.base_salary;
-        const finalAllowances = allowances || (salaryConfig ? JSON.parse(salaryConfig.allowances_json) : {});
-        const finalDeductions = deductions || (salaryConfig ? JSON.parse(salaryConfig.deductions_json) : {});
-
-        // Calculate Net
-        let totalAllowances = 0;
-        for (const k in finalAllowances) totalAllowances += Number(finalAllowances[k]);
-
-        let totalDeductions = 0;
-        for (const k in finalDeductions) totalDeductions += Number(finalDeductions[k]);
-
-        const netSalary = Number(finalBase) + totalAllowances - totalDeductions;
-
-        // N11: Negative salary
-        if (netSalary < 0) {
-            return res.status(400).json({ error: 'Net salary cannot be negative' });
-        }
-
-        const result = await db.run(
-            `INSERT INTO payslips 
-             (tenant_id, employee_id, period_start, period_end, base_salary, allowances_json, deductions_json, net_salary) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [req.tenantId, employee_id, period_start, period_end, finalBase, JSON.stringify(finalAllowances), JSON.stringify(finalDeductions), netSalary]
+        // Create Run
+        const runResult = await db.run(
+            "INSERT INTO payroll_runs (tenant_id, period, created_by) VALUES (?, ?, ?)",
+            [req.tenantId, period, req.user.id]
         );
+        const runId = runResult.lastID;
 
-        res.status(201).json({ id: result.lastID, net_salary: netSalary });
+        // For each employee, calculate and insert item
+        // Simplified: just assuming base salary from salaries table
+        for (const empId of employee_ids) {
+            const salary = await db.get("SELECT * FROM salaries WHERE employee_id = ?", [empId]);
+            if (salary) {
+                // Mock calc
+                const net = salary.base_salary;
+                await db.run(
+                    "INSERT INTO payroll_items (payroll_run_id, employee_id, base_salary, net_salary) VALUES (?, ?, ?, ?)",
+                    [runId, empId, salary.base_salary, net]
+                );
+            }
+        }
+
+        res.status(201).json({ id: runId, message: 'Payroll draft created' });
     } catch (err) {
         next(err);
     }
+};
+
+const submit = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const db = await getDb();
+        await db.run("UPDATE payroll_runs SET status = 'pending' WHERE id = ? AND tenant_id = ?", [id, req.tenantId]);
+        res.json({ message: 'Payroll submitted for approval' });
+    } catch (err) {
+        next(err);
+    }
+};
+
+const approve = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const db = await getDb();
+        await db.run("UPDATE payroll_runs SET status = 'approved', approved_by = ? WHERE id = ? AND tenant_id = ?", [req.user.id, id, req.tenantId]);
+
+        await logApproval(req.tenantId, 'PAYROLL', id, 'APPROVE', req.user.id);
+
+        res.json({ message: 'Payroll approved' });
+    } catch (err) {
+        next(err);
+    }
+};
+
+const listRuns = async (req, res, next) => {
+    try {
+        const db = await getDb();
+        const runs = await db.all("SELECT * FROM payroll_runs WHERE tenant_id = ? ORDER BY created_at DESC", [req.tenantId]);
+        res.json(runs);
+    } catch (err) {
+        next(err);
+    }
+};
+
+// Keep old functions for backward compatibility if needed, or replace
+const create = async (req, res, next) => {
+    // Legacy single payslip creation
+    res.status(501).json({ error: 'Use new payroll run flow' });
 };
 
 const getPayslip = async (req, res, next) => {
@@ -54,10 +80,10 @@ const getPayslip = async (req, res, next) => {
         const db = await getDb();
 
         const payslip = await db.get(
-            `SELECT p.*, e.nik, u.name, e.position, e.department 
-             FROM payslips p 
-             JOIN employees e ON p.employee_id = e.id 
-             JOIN users u ON e.user_id = u.id 
+            `SELECT p.*, e.nik, u.name, e.position, e.department
+             FROM payslips p
+             JOIN employees e ON p.employee_id = e.id
+             JOIN users u ON e.user_id = u.id
              WHERE p.id = ? AND p.tenant_id = ?`,
             [id, req.tenantId]
         );
@@ -101,4 +127,4 @@ const getPayslip = async (req, res, next) => {
     }
 };
 
-module.exports = { create, getPayslip };
+module.exports = { createDraft, submit, approve, listRuns, create, getPayslip };
