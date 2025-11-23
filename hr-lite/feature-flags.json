@@ -1,0 +1,8 @@
+{
+  "premium_payroll": false,
+  "recruitment_ats": false,
+  "performance_reviews": false,
+  "training_certification": false,
+  "asset_management": false,
+  "integrations": false
+}
