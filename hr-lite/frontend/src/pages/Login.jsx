@@ -41,7 +41,7 @@ const Login = () => {
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
                         marginBottom: '10px'
-                    }}>HR Lite</h1>
+                    }}>Attendify</h1>
                     <p style={{ color: '#94a3b8' }}>Sign in to your account</p>
                 </div>
 

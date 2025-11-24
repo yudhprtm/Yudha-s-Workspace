@@ -64,7 +64,7 @@ const Layout = ({ children }) => {
             {/* Mobile Header */}
             <div className="mobile-header">
                 <button onClick={toggleSidebar} className="menu-btn">☰</button>
-                <span className="brand-logo" style={{ fontSize: '1.2rem' }}>HR Lite</span>
+                <span className="brand-logo" style={{ fontSize: '1.2rem' }}>Attendify</span>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button onClick={() => setShowNotifications(!showNotifications)} className="theme-toggle" style={{ position: 'relative' }}>
                         🔔
@@ -98,7 +98,7 @@ const Layout = ({ children }) => {
 
             <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
                 <div className="sidebar-header">
-                    <span className="brand-logo">HR Lite</span>
+                    <span className="brand-logo">Attendify</span>
                     <button className="close-btn" onClick={closeSidebar}>×</button>
                 </div>
 
