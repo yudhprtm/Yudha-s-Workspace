@@ -77,11 +77,14 @@ const getMonthly = async (req, res, next) => {
 
         const db = await getDb();
         // If admin/hr/manager, can see all. Employee sees only theirs.
-        let sql = `SELECT a.*, e.nik, u.name 
+        // Fix: Filter by local time (GMT+7) and return local time columns
+        let sql = `SELECT a.*, e.nik, u.name,
+                   datetime(a.clock_in, '+7 hours') as clock_in_local,
+                   datetime(a.clock_out, '+7 hours') as clock_out_local
                    FROM attendance a 
                    JOIN employees e ON a.employee_id = e.id 
                    JOIN users u ON e.user_id = u.id 
-                   WHERE a.tenant_id = ? AND strftime('%Y-%m', a.clock_in) = ?`;
+                   WHERE a.tenant_id = ? AND strftime('%Y-%m', datetime(a.clock_in, '+7 hours')) = ?`;
         const params = [req.tenantId, month];
 
         if (req.user.role === 'EMPLOYEE') {
@@ -102,15 +105,23 @@ const getRecent = async (req, res, next) => {
         const db = await getDb();
         const userId = req.user.id;
 
-        // Default to current month
+        // Default to current month (Local Time GMT+7)
+        // We can't easily get "local time" in Node without a library or manual offset, 
+        // but for query purposes we can just use the server time if it's close, 
+        // OR better: let's just ask for the last 30 days or similar? 
+        // The requirement says "Default to current month".
+        // Let's manually adjust to GMT+7 for the "current month" string.
         const now = new Date();
-        const month = now.toISOString().slice(0, 7); // YYYY-MM
+        const localNow = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+        const month = localNow.toISOString().slice(0, 7); // YYYY-MM
 
-        let sql = `SELECT a.*, e.nik, u.name 
+        let sql = `SELECT a.*, e.nik, u.name,
+                   datetime(a.clock_in, '+7 hours') as clock_in_local,
+                   datetime(a.clock_out, '+7 hours') as clock_out_local
                    FROM attendance a 
                    JOIN employees e ON a.employee_id = e.id 
                    JOIN users u ON e.user_id = u.id 
-                   WHERE a.tenant_id = ? AND strftime('%Y-%m', a.clock_in) = ?`;
+                   WHERE a.tenant_id = ? AND strftime('%Y-%m', datetime(a.clock_in, '+7 hours')) = ?`;
         const params = [req.tenantId, month];
 
         if (req.user.role === 'EMPLOYEE') {

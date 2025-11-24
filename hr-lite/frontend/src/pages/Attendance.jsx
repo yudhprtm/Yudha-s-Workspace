@@ -184,6 +184,7 @@ const Attendance = () => {
                 <table>
                     <thead>
                         <tr>
+                            <th>Employee</th>
                             <th>Date</th>
                             <th>Clock In</th>
                             <th>Clock Out</th>
@@ -193,6 +194,7 @@ const Attendance = () => {
                     <tbody>
                         {logs.map((log) => (
                             <tr key={log.id}>
+                                <td>{log.name}</td>
                                 <td>{new Date(log.clock_in).toLocaleDateString()}</td>
                                 <td>{new Date(log.clock_in).toLocaleTimeString()}</td>
                                 <td>{log.clock_out ? new Date(log.clock_out).toLocaleTimeString() : '-'}</td>
