@@ -74,21 +74,46 @@ const updateStatus = async (req, res, next) => {
 const list = async (req, res, next) => {
     try {
         const db = await getDb();
-        let sql = `SELECT l.*, e.nik, u.name 
-                   FROM leave_requests l 
-                   JOIN employees e ON l.employee_id = e.id 
-                   JOIN users u ON e.user_id = u.id 
-                   WHERE l.tenant_id = ?`;
-        const params = [req.tenantId];
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+        const sortBy = req.query.sortBy || 'start_date';
+        const sortOrder = req.query.sortOrder || 'DESC';
+
+        let whereClause = "WHERE l.tenant_id = ?";
+        let params = [req.tenantId];
 
         if (req.user.role === 'EMPLOYEE') {
             const employee = await db.get("SELECT id FROM employees WHERE user_id = ?", [req.user.id]);
-            sql += " AND l.employee_id = ?";
+            whereClause += " AND l.employee_id = ?";
             params.push(employee.id);
         }
 
-        const requests = await db.all(sql, params);
-        res.json(requests);
+        const countSql = `SELECT COUNT(*) as total 
+                          FROM leave_requests l 
+                          JOIN employees e ON l.employee_id = e.id 
+                          JOIN users u ON e.user_id = u.id 
+                          ${whereClause}`;
+        const countResult = await db.get(countSql, params);
+        const total = countResult.total;
+
+        const sql = `SELECT l.*, e.nik, u.name 
+                     FROM leave_requests l 
+                     JOIN employees e ON l.employee_id = e.id 
+                     JOIN users u ON e.user_id = u.id 
+                     ${whereClause}
+                     ORDER BY ${sortBy} ${sortOrder}
+                     LIMIT ? OFFSET ?`;
+
+        const requests = await db.all(sql, [...params, limit, offset]);
+
+        res.json({
+            data: requests,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (err) {
         next(err);
     }

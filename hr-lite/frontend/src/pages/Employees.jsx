@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useToast } from '../components/Toast';
+import Pagination from '../components/Pagination';
 
 const Employees = () => {
     const [employees, setEmployees] = useState([]);
@@ -23,14 +24,20 @@ const Employees = () => {
     const user = JSON.parse(atob(localStorage.getItem('token').split('.')[1]));
     const tenantId = user.tenantId;
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(0);
+    const limit = 10;
+
     useEffect(() => {
         fetchEmployees();
-    }, []);
+    }, [currentPage]);
 
     const fetchEmployees = async () => {
         try {
-            const { data } = await api.get(`/api/${tenantId}/employees`);
-            setEmployees(data);
+            const { data } = await api.get(`/api/${tenantId}/employees?page=${currentPage}&limit=${limit}`);
+            setEmployees(data.data);
+            setTotalPages(data.totalPages);
         } catch (err) {
             console.error(err);
             addToast('Failed to fetch employees', 'error');
@@ -157,6 +164,11 @@ const Employees = () => {
                         ))}
                     </tbody>
                 </table>
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                />
             </div>
 
             {showModal && (

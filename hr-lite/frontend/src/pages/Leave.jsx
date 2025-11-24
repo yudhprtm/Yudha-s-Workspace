@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useToast } from '../components/Toast';
+import Pagination from '../components/Pagination';
 
 const Leave = () => {
     const [leaves, setLeaves] = useState([]);
@@ -8,6 +9,11 @@ const Leave = () => {
     const user = JSON.parse(atob(localStorage.getItem('token').split('.')[1]));
     const tenantId = user.tenantId;
     const { addToast } = useToast();
+
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(0);
+    const limit = 10;
 
     // Add Request Modal State
     const [showModal, setShowModal] = useState(false);
@@ -21,12 +27,13 @@ const Leave = () => {
 
     useEffect(() => {
         fetchLeaves();
-    }, []);
+    }, [currentPage]);
 
     const fetchLeaves = async () => {
         try {
-            const { data } = await api.get(`/api/${tenantId}/leave`);
-            setLeaves(data || []);
+            const { data } = await api.get(`/api/${tenantId}/leave?page=${currentPage}&limit=${limit}`);
+            setLeaves(data.data || []);
+            setTotalPages(data.totalPages);
         } catch (err) {
             console.error(err);
             addToast('Failed to fetch leaves', 'error');
@@ -71,48 +78,55 @@ const Leave = () => {
                 {leaves.length === 0 ? (
                     <p style={{ textAlign: 'center', color: '#94a3b8' }}>No leave requests found.</p>
                 ) : (
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Employee</th>
-                                <th>Type</th>
-                                <th>Dates</th>
-                                <th>Days</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {leaves.map((l) => (
-                                <tr key={l.id}>
-                                    <td>{l.name}</td>
-                                    <td>{l.type}</td>
-                                    <td>{l.start_date} to {l.end_date}</td>
-                                    <td>{l.days}</td>
-                                    <td>
-                                        <span style={{
-                                            padding: '4px 8px',
-                                            borderRadius: '4px',
-                                            backgroundColor: l.status === 'approved' ? 'rgba(34, 197, 94, 0.2)' : l.status === 'rejected' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(234, 179, 8, 0.2)',
-                                            color: l.status === 'approved' ? '#22c55e' : l.status === 'rejected' ? '#ef4444' : '#eab308',
-                                            fontWeight: '600',
-                                            fontSize: '0.85rem'
-                                        }}>
-                                            {l.status}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {l.status === 'pending' && ['ADMIN', 'HR', 'MANAGER'].includes(user.role) && (
-                                            <div style={{ display: 'flex', gap: '10px' }}>
-                                                <button onClick={() => handleStatus(l.id, 'approve')} style={{ color: '#22c55e', background: 'none', border: 'none', cursor: 'pointer' }}>Approve</button>
-                                                <button onClick={() => handleStatus(l.id, 'reject')} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>Reject</button>
-                                            </div>
-                                        )}
-                                    </td>
+                    <>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Type</th>
+                                    <th>Dates</th>
+                                    <th>Days</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {leaves.map((l) => (
+                                    <tr key={l.id}>
+                                        <td>{l.name}</td>
+                                        <td>{l.type}</td>
+                                        <td>{l.start_date} to {l.end_date}</td>
+                                        <td>{l.days}</td>
+                                        <td>
+                                            <span style={{
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                backgroundColor: l.status === 'approved' ? 'rgba(34, 197, 94, 0.2)' : l.status === 'rejected' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(234, 179, 8, 0.2)',
+                                                color: l.status === 'approved' ? '#22c55e' : l.status === 'rejected' ? '#ef4444' : '#eab308',
+                                                fontWeight: '600',
+                                                fontSize: '0.85rem'
+                                            }}>
+                                                {l.status}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {l.status === 'pending' && ['ADMIN', 'HR', 'MANAGER'].includes(user.role) && (
+                                                <div style={{ display: 'flex', gap: '10px' }}>
+                                                    <button onClick={() => handleStatus(l.id, 'approve')} style={{ color: '#22c55e', background: 'none', border: 'none', cursor: 'pointer' }}>Approve</button>
+                                                    <button onClick={() => handleStatus(l.id, 'reject')} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>Reject</button>
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={setCurrentPage}
+                        />
+                    </>
                 )}
             </div>
 

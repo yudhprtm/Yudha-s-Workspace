@@ -25,15 +25,38 @@ const requestCorrection = async (req, res) => {
 const listCorrections = async (req, res) => {
     try {
         const db = await getDb();
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+        const sortBy = req.query.sortBy || 'date';
+        const sortOrder = req.query.sortOrder || 'DESC';
+
+        const countResult = await db.get(
+            `SELECT COUNT(*) as total 
+             FROM attendance_corrections ac
+             WHERE ac.tenant_id = ? AND ac.status = 'pending'`,
+            [req.tenantId]
+        );
+        const total = countResult.total;
+
         const corrections = await db.all(
             `SELECT ac.*, u.name as employee_name 
              FROM attendance_corrections ac
              JOIN employees e ON ac.employee_id = e.id
              JOIN users u ON e.user_id = u.id
-             WHERE ac.tenant_id = ? AND ac.status = 'pending'`,
-            [req.tenantId]
+             WHERE ac.tenant_id = ? AND ac.status = 'pending'
+             ORDER BY ${sortBy} ${sortOrder}
+             LIMIT ? OFFSET ?`,
+            [req.tenantId, limit, offset]
         );
-        res.json(corrections);
+
+        res.json({
+            data: corrections,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to fetch corrections' });

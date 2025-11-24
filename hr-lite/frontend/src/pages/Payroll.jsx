@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useToast } from '../components/Toast';
+import Pagination from '../components/Pagination';
 
 const Payroll = () => {
     const [employees, setEmployees] = useState([]);
@@ -14,18 +15,25 @@ const Payroll = () => {
     const [selectedEmployees, setSelectedEmployees] = useState([]);
     const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(0);
+    const limit = 10;
+
     useEffect(() => {
         if (['HR', 'ADMIN'].includes(user.role)) {
             fetchEmployees();
             fetchPayrollRuns();
+        } else {
+            setLoading(false);
         }
-        setLoading(false);
-    }, []);
+    }, [currentPage]);
 
     const fetchEmployees = async () => {
         try {
-            const { data } = await api.get(`/api/${tenantId}/employees`);
-            setEmployees(data);
+            // Fetching with a higher limit for the dropdown
+            const { data } = await api.get(`/api/${tenantId}/employees?limit=100`);
+            setEmployees(data.data || []);
         } catch (err) {
             console.error(err);
         }
@@ -33,10 +41,13 @@ const Payroll = () => {
 
     const fetchPayrollRuns = async () => {
         try {
-            const { data } = await api.get(`/api/${tenantId}/payroll/runs`);
-            setPayrollRuns(data);
+            const { data } = await api.get(`/api/${tenantId}/payroll/runs?page=${currentPage}&limit=${limit}`);
+            setPayrollRuns(data.data || []);
+            setTotalPages(data.totalPages);
+            setLoading(false);
         } catch (err) {
             console.error(err);
+            setLoading(false);
         }
     };
 
@@ -136,6 +147,11 @@ const Payroll = () => {
                         ))}
                     </tbody>
                 </table>
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                />
             </div>
         </div>
     );

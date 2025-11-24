@@ -3,15 +3,29 @@ const bcrypt = require('bcryptjs');
 
 const list = async (req, res, next) => {
     try {
+        const { page = 1, limit = 10 } = req.query;
+        const offset = (page - 1) * limit;
         const db = await getDb();
+
+        const countResult = await db.get("SELECT COUNT(*) as total FROM employees WHERE tenant_id = ?", [req.tenantId]);
+        const total = countResult.total;
+
         const employees = await db.all(
             `SELECT e.*, u.name, u.email, u.role, u.status 
              FROM employees e 
              JOIN users u ON e.user_id = u.id 
-             WHERE e.tenant_id = ?`,
-            [req.tenantId]
+             WHERE e.tenant_id = ?
+             LIMIT ? OFFSET ?`,
+            [req.tenantId, limit, offset]
         );
-        res.json(employees);
+
+        res.json({
+            data: employees,
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (err) {
         next(err);
     }

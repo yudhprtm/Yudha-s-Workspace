@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useToast } from '../components/Toast';
+import Pagination from '../components/Pagination';
 
 const Attendance = () => {
     const [logs, setLogs] = useState([]);
@@ -22,17 +23,28 @@ const Attendance = () => {
         reason: ''
     });
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(0);
+    const [correctionsPage, setCorrectionsPage] = useState(1);
+    const [correctionsTotalPages, setCorrectionsTotalPages] = useState(0);
+    const limit = 10;
+
     useEffect(() => {
         fetchAttendance();
+    }, [currentPage]);
+
+    useEffect(() => {
         if (['ADMIN', 'HR', 'MANAGER'].includes(user.role)) {
             fetchCorrections();
         }
-    }, []);
+    }, [correctionsPage]);
 
     const fetchAttendance = async () => {
         try {
-            const { data } = await api.get(`/api/${tenantId}/attendance`);
-            setLogs(data);
+            const { data } = await api.get(`/api/${tenantId}/attendance?page=${currentPage}&limit=${limit}`);
+            setLogs(data.data);
+            setTotalPages(data.totalPages);
         } catch (err) {
             console.error(err);
         } finally {
@@ -42,8 +54,9 @@ const Attendance = () => {
 
     const fetchCorrections = async () => {
         try {
-            const { data } = await api.get(`/api/${tenantId}/attendance/corrections`);
-            setCorrections(data);
+            const { data } = await api.get(`/api/${tenantId}/attendance/corrections?page=${correctionsPage}&limit=${limit}`);
+            setCorrections(data.data);
+            setCorrectionsTotalPages(data.totalPages);
         } catch (err) {
             console.error(err);
         }
@@ -117,18 +130,14 @@ const Attendance = () => {
 
     const proceedToEdit = (log) => {
         if (!log) return;
-
-        // Pre-fill form
         const clockInDate = new Date(log.clock_in);
         const clockOutDate = log.clock_out ? new Date(log.clock_out) : null;
-
         const formatDateTime = (date) => {
             if (!date) return '';
             const offset = date.getTimezoneOffset() * 60000;
             const localISOTime = (new Date(date - offset)).toISOString().slice(0, 16);
             return localISOTime;
         };
-
         setFormData({
             date: clockInDate.toISOString().split('T')[0],
             old_clock_in: formatDateTime(clockInDate),
@@ -177,6 +186,11 @@ const Attendance = () => {
                             ))}
                         </tbody>
                     </table>
+                    <Pagination
+                        currentPage={correctionsPage}
+                        totalPages={correctionsTotalPages}
+                        onPageChange={setCorrectionsPage}
+                    />
                 </div>
             )}
 
@@ -203,6 +217,11 @@ const Attendance = () => {
                         ))}
                     </tbody>
                 </table>
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                />
             </div>
 
             {showModal && (
@@ -212,7 +231,6 @@ const Attendance = () => {
                             <h2>Request Correction</h2>
                             <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-muted)' }}>&times;</button>
                         </div>
-
                         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
                             {/* Left Panel: List */}
                             <div style={{ width: '350px', borderRight: '1px solid var(--border)', overflowY: 'auto', padding: '20px', background: 'var(--bg-surface)' }}>
@@ -225,7 +243,6 @@ const Attendance = () => {
                                     >
                                         <span>➕</span> New Request (Missing Date)
                                     </button>
-
                                     {logs.map(log => (
                                         <div
                                             key={log.id}
@@ -248,7 +265,6 @@ const Attendance = () => {
                                     ))}
                                 </div>
                             </div>
-
                             {/* Right Panel: Form */}
                             <div style={{ flex: 1, padding: '20px', overflowY: 'auto' }}>
                                 <form onSubmit={handleCorrectionSubmit}>
@@ -257,13 +273,22 @@ const Attendance = () => {
                                             <label>Date</label>
                                             <input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} required />
                                         </div>
-
-                                        <div><label>Old Clock In</label><input type="datetime-local" value={formData.old_clock_in} onChange={e => setFormData({ ...formData, old_clock_in: e.target.value })} /></div>
-                                        <div><label>Old Clock Out</label><input type="datetime-local" value={formData.old_clock_out} onChange={e => setFormData({ ...formData, old_clock_out: e.target.value })} /></div>
-
-                                        <div><label>New Clock In</label><input type="datetime-local" value={formData.new_clock_in} onChange={e => setFormData({ ...formData, new_clock_in: e.target.value })} required /></div>
-                                        <div><label>New Clock Out</label><input type="datetime-local" value={formData.new_clock_out} onChange={e => setFormData({ ...formData, new_clock_out: e.target.value })} /></div>
-
+                                        <div>
+                                            <label>Old Clock In</label>
+                                            <input type="datetime-local" value={formData.old_clock_in} onChange={e => setFormData({ ...formData, old_clock_in: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label>Old Clock Out</label>
+                                            <input type="datetime-local" value={formData.old_clock_out} onChange={e => setFormData({ ...formData, old_clock_out: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label>New Clock In</label>
+                                            <input type="datetime-local" value={formData.new_clock_in} onChange={e => setFormData({ ...formData, new_clock_in: e.target.value })} required />
+                                        </div>
+                                        <div>
+                                            <label>New Clock Out</label>
+                                            <input type="datetime-local" value={formData.new_clock_out} onChange={e => setFormData({ ...formData, new_clock_out: e.target.value })} />
+                                        </div>
                                         <div style={{ gridColumn: '1 / -1' }}>
                                             <label>Reason</label>
                                             <textarea
@@ -272,10 +297,9 @@ const Attendance = () => {
                                                 required
                                                 style={{ minHeight: '100px' }}
                                                 placeholder="Explain why you need this correction..."
-                                            ></textarea>
+                                            />
                                         </div>
                                     </div>
-
                                     <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                                         <button type="button" onClick={() => setShowModal(false)} className="btn">Cancel</button>
                                         <button type="submit" className="btn btn-primary">Submit Request</button>
@@ -294,7 +318,6 @@ const Attendance = () => {
                             <h2>Review Request</h2>
                             <button onClick={() => setShowApprovalModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-muted)' }}>&times;</button>
                         </div>
-
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                             <div>
                                 <label>Employee</label>
@@ -318,7 +341,7 @@ const Attendance = () => {
                             </div>
                             <div>
                                 <label>Reason</label>
-                                <div style={{ padding: '10px', background: 'var(--bg-input)', borderRadius: '4px', fontStyle: 'italic' }}>"{selectedCorrection.reason}"</div>
+                                <div style={{ padding: '10px', background: 'var(--bg-input)', borderRadius: '4px', fontStyle: 'italic' }}>{selectedCorrection.reason}</div>
                             </div>
                             {selectedCorrection.evidence && (
                                 <div>
@@ -327,7 +350,6 @@ const Attendance = () => {
                                 </div>
                             )}
                         </div>
-
                         <div style={{ marginTop: '25px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid var(--border)', paddingTop: '15px' }}>
                             <button onClick={() => setShowApprovalModal(false)} className="btn">Close</button>
                             <button onClick={() => handleCorrectionStatus(selectedCorrection.id, 'reject')} className="btn" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>Reject</button>

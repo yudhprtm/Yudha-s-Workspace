@@ -61,8 +61,30 @@ const approve = async (req, res, next) => {
 const listRuns = async (req, res, next) => {
     try {
         const db = await getDb();
-        const runs = await db.all("SELECT * FROM payroll_runs WHERE tenant_id = ? ORDER BY created_at DESC", [req.tenantId]);
-        res.json(runs);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+        const sortBy = req.query.sortBy || 'created_at';
+        const sortOrder = req.query.sortOrder || 'DESC';
+
+        const countResult = await db.get("SELECT COUNT(*) as total FROM payroll_runs WHERE tenant_id = ?", [req.tenantId]);
+        const total = countResult.total;
+
+        const runs = await db.all(
+            `SELECT * FROM payroll_runs 
+             WHERE tenant_id = ? 
+             ORDER BY ${sortBy} ${sortOrder} 
+             LIMIT ? OFFSET ?`,
+            [req.tenantId, limit, offset]
+        );
+
+        res.json({
+            data: runs,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (err) {
         next(err);
     }

@@ -72,29 +72,45 @@ const clockOut = async (req, res, next) => {
 
 const getMonthly = async (req, res, next) => {
     try {
-        const { month } = req.query; // YYYY-MM
+        const { month, page = 1, limit = 10 } = req.query; // YYYY-MM
         if (!month) return res.status(400).json({ error: 'Month required (YYYY-MM)' });
 
+        const offset = (page - 1) * limit;
         const db = await getDb();
-        // If admin/hr/manager, can see all. Employee sees only theirs.
-        // Fix: Filter by local time (GMT+7) and return local time columns
-        let sql = `SELECT a.*, e.nik, u.name,
-                   datetime(a.clock_in, '+7 hours') as clock_in_local,
-                   datetime(a.clock_out, '+7 hours') as clock_out_local
-                   FROM attendance a 
-                   JOIN employees e ON a.employee_id = e.id 
-                   JOIN users u ON e.user_id = u.id 
-                   WHERE a.tenant_id = ? AND strftime('%Y-%m', datetime(a.clock_in, '+7 hours')) = ?`;
+
+        // Base query
+        let baseSql = `FROM attendance a 
+                       JOIN employees e ON a.employee_id = e.id 
+                       JOIN users u ON e.user_id = u.id 
+                       WHERE a.tenant_id = ? AND strftime('%Y-%m', datetime(a.clock_in, '+7 hours')) = ?`;
         const params = [req.tenantId, month];
 
         if (req.user.role === 'EMPLOYEE') {
             const employee = await db.get("SELECT id FROM employees WHERE user_id = ?", [req.user.id]);
-            sql += " AND a.employee_id = ?";
+            baseSql += " AND a.employee_id = ?";
             params.push(employee.id);
         }
 
-        const records = await db.all(sql, params);
-        res.json(records);
+        // Count total
+        const countResult = await db.get(`SELECT COUNT(*) as total ${baseSql}`, params);
+        const total = countResult.total;
+
+        // Fetch paginated data
+        const sql = `SELECT a.*, e.nik, u.name,
+                   datetime(a.clock_in, '+7 hours') as clock_in_local,
+                   datetime(a.clock_out, '+7 hours') as clock_out_local
+                   ${baseSql}
+                   LIMIT ? OFFSET ?`;
+
+        const records = await db.all(sql, [...params, limit, offset]);
+
+        res.json({
+            data: records,
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (err) {
         next(err);
     }
@@ -102,39 +118,49 @@ const getMonthly = async (req, res, next) => {
 
 const getRecent = async (req, res, next) => {
     try {
+        const { page = 1, limit = 10 } = req.query;
+        const offset = (page - 1) * limit;
         const db = await getDb();
         const userId = req.user.id;
 
-        // Default to current month (Local Time GMT+7)
-        // We can't easily get "local time" in Node without a library or manual offset, 
-        // but for query purposes we can just use the server time if it's close, 
-        // OR better: let's just ask for the last 30 days or similar? 
-        // The requirement says "Default to current month".
-        // Let's manually adjust to GMT+7 for the "current month" string.
         const now = new Date();
         const localNow = new Date(now.getTime() + (7 * 60 * 60 * 1000));
         const month = localNow.toISOString().slice(0, 7); // YYYY-MM
 
-        let sql = `SELECT a.*, e.nik, u.name,
-                   datetime(a.clock_in, '+7 hours') as clock_in_local,
-                   datetime(a.clock_out, '+7 hours') as clock_out_local
-                   FROM attendance a 
-                   JOIN employees e ON a.employee_id = e.id 
-                   JOIN users u ON e.user_id = u.id 
-                   WHERE a.tenant_id = ? AND strftime('%Y-%m', datetime(a.clock_in, '+7 hours')) = ?`;
+        let baseSql = `FROM attendance a 
+                       JOIN employees e ON a.employee_id = e.id 
+                       JOIN users u ON e.user_id = u.id 
+                       WHERE a.tenant_id = ? AND strftime('%Y-%m', datetime(a.clock_in, '+7 hours')) = ?`;
         const params = [req.tenantId, month];
 
         if (req.user.role === 'EMPLOYEE') {
             const employee = await db.get("SELECT id FROM employees WHERE user_id = ?", [userId]);
-            if (!employee) return res.json([]); // Return empty if no profile
-            sql += " AND a.employee_id = ?";
+            if (!employee) return res.json({ data: [], total: 0, page: 1, limit: 10, totalPages: 0 });
+            baseSql += " AND a.employee_id = ?";
             params.push(employee.id);
         }
 
-        sql += " ORDER BY a.clock_in DESC";
+        // Count total
+        const countResult = await db.get(`SELECT COUNT(*) as total ${baseSql}`, params);
+        const total = countResult.total;
 
-        const records = await db.all(sql, params);
-        res.json(records);
+        // Fetch data
+        const sql = `SELECT a.*, e.nik, u.name,
+                   datetime(a.clock_in, '+7 hours') as clock_in_local,
+                   datetime(a.clock_out, '+7 hours') as clock_out_local
+                   ${baseSql}
+                   ORDER BY a.clock_in DESC
+                   LIMIT ? OFFSET ?`;
+
+        const records = await db.all(sql, [...params, limit, offset]);
+
+        res.json({
+            data: records,
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (err) {
         next(err);
     }
