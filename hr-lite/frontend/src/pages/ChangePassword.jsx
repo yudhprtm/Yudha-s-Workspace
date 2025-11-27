@@ -8,6 +8,9 @@ const ChangePassword = () => {
         newPassword: '',
         confirmPassword: ''
     });
+    const [showCurrent, setShowCurrent] = useState(false);
+    const [showNew, setShowNew] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
     const [loading, setLoading] = useState(false);
     const { addToast } = useToast();
     const user = JSON.parse(atob(localStorage.getItem('token').split('.')[1]));
@@ -54,35 +57,92 @@ const ChangePassword = () => {
                 <form onSubmit={handleSubmit}>
                     <div style={{ marginBottom: '20px' }}>
                         <label style={{ display: 'block', marginBottom: '8px', color: '#475569' }}>Current Password</label>
-                        <input
-                            type="password"
-                            value={formData.currentPassword}
-                            onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-                            required
-                            style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                        />
+                        <div style={{ position: 'relative' }}>
+                            <input
+                                type={showCurrent ? 'text' : 'password'}
+                                value={formData.currentPassword}
+                                onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+                                required
+                                style={{ width: '100%', padding: '10px', paddingRight: '40px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowCurrent(!showCurrent)}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '1.2rem',
+                                    color: '#94a3b8'
+                                }}
+                            >
+                                {showCurrent ? '👁️' : '🔒'}
+                            </button>
+                        </div>
                     </div>
                     <div style={{ marginBottom: '20px' }}>
                         <label style={{ display: 'block', marginBottom: '8px', color: '#475569' }}>New Password</label>
-                        <input
-                            type="password"
-                            value={formData.newPassword}
-                            onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                            required
-                            minLength={6}
-                            style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                        />
+                        <div style={{ position: 'relative' }}>
+                            <input
+                                type={showNew ? 'text' : 'password'}
+                                value={formData.newPassword}
+                                onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                                required
+                                minLength={6}
+                                style={{ width: '100%', padding: '10px', paddingRight: '40px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowNew(!showNew)}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '1.2rem',
+                                    color: '#94a3b8'
+                                }}
+                            >
+                                {showNew ? '👁️' : '🔒'}
+                            </button>
+                        </div>
                     </div>
                     <div style={{ marginBottom: '20px' }}>
                         <label style={{ display: 'block', marginBottom: '8px', color: '#475569' }}>Confirm New Password</label>
-                        <input
-                            type="password"
-                            value={formData.confirmPassword}
-                            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                            required
-                            minLength={6}
-                            style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                        />
+                        <div style={{ position: 'relative' }}>
+                            <input
+                                type={showConfirm ? 'text' : 'password'}
+                                value={formData.confirmPassword}
+                                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                                required
+                                minLength={6}
+                                style={{ width: '100%', padding: '10px', paddingRight: '40px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirm(!showConfirm)}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '1.2rem',
+                                    color: '#94a3b8'
+                                }}
+                            >
+                                {showConfirm ? '👁️' : '🔒'}
+                            </button>
+                        </div>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <button

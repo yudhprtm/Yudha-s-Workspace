@@ -5,6 +5,7 @@ import axios from 'axios';
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -75,13 +76,33 @@ const Login = () => {
                             <label style={{ marginBottom: 0 }}>Password</label>
                             <a href="/forgot-password" style={{ fontSize: '0.85rem', color: '#6366f1', textDecoration: 'none' }}>Forgot Password?</a>
                         </div>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            required
-                        />
+                        <div style={{ position: 'relative' }}>
+                            <input
+                                type={showPassword ? 'text' : 'password'}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                                style={{ width: '100%', paddingRight: '40px' }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '1.2rem',
+                                    color: '#94a3b8'
+                                }}
+                            >
+                                {showPassword ? '👁️' : '🔒'}
+                            </button>
+                        </div>
                     </div>
                     <button
                         type="submit"
