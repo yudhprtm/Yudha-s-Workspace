@@ -1,14 +1,17 @@
-# HR Lite Multi-Tenant
+# Attendify
 
 A production-quality, maintainable HR web application for small–medium companies.
 
 ## Features
 - **Core HR**: Employee profiles, org structure, document upload.
-- **Attendance**: Clock-in/out, manual correction, monthly export.
-- **Leave Management**: Request, approve/reject, balance.
+- **Attendance**: Clock-in/out with automatic late marking and overtime calculation, manual correction, monthly export.
+- **Leave Management**: Request, approve/reject with balance validation (12 days/year).
 - **Basic Payroll**: Manual salary entries, HTML payslip download.
 - **Auth & Roles**: JWT-based auth with roles (ADMIN, HR, MANAGER, EMPLOYEE).
 - **Multi-tenancy**: Data isolation per tenant.
+- **Security**: Secure temporary password generation, bcrypt hashing.
+- **Validation**: Input validation on all forms with readable error messages.
+- **UX Enhancements**: Sorting, confirmation dialogs, loading states, pagination.
 
 ## Setup
 

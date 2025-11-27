@@ -7,6 +7,7 @@ router.use(authenticate);
 router.use(checkTenant);
 
 router.post('/', leaveController.requestLeave);
+router.get('/balance', leaveController.getBalance);
 router.get('/', leaveController.list);
 router.patch('/:id/approve', authorize(['ADMIN', 'HR', 'MANAGER']), leaveController.approve);
 router.patch('/:id/reject', authorize(['ADMIN', 'HR', 'MANAGER']), leaveController.reject);

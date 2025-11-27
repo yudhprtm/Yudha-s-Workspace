@@ -25,8 +25,12 @@ const Leave = () => {
         reason: ''
     });
 
+    // Leave Balance State
+    const [balance, setBalance] = useState(null);
+
     useEffect(() => {
         fetchLeaves();
+        fetchBalance();
     }, [currentPage]);
 
     const fetchLeaves = async () => {
@@ -42,12 +46,22 @@ const Leave = () => {
         }
     };
 
+    const fetchBalance = async () => {
+        try {
+            const { data } = await api.get(`/api/${tenantId}/leave/balance`);
+            setBalance(data);
+        } catch (err) {
+            console.error('Failed to fetch balance:', err);
+        }
+    };
+
     const handleStatus = async (id, status) => {
         try {
             // status is 'approve' or 'reject'
             await api.patch(`/api/${tenantId}/leave/${id}/${status}`);
             addToast(`Leave request ${status}d`, 'success');
             fetchLeaves();
+            fetchBalance();
         } catch (err) {
             addToast('Action failed', 'error');
         }
@@ -60,6 +74,7 @@ const Leave = () => {
             addToast('Leave requested successfully', 'success');
             setShowModal(false);
             fetchLeaves();
+            fetchBalance();
         } catch (err) {
             addToast(err.response?.data?.error || 'Request failed', 'error');
         }
@@ -73,6 +88,31 @@ const Leave = () => {
                 <h1>Leave Requests</h1>
                 <button onClick={() => setShowModal(true)} className="btn btn-primary">Request Leave</button>
             </div>
+
+            {balance && (
+                <div className="card" style={{ marginBottom: '20px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <h3 style={{ margin: '0 0 10px 0', fontSize: '1rem', opacity: 0.9 }}>Leave Balance ({balance.year})</h3>
+                            <div style={{ display: 'flex', gap: '30px', marginTop: '10px' }}>
+                                <div>
+                                    <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>Total Allowance</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{balance.allowance} days</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>Used</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{balance.used} days</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>Remaining</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: balance.remaining < 3 ? '#fbbf24' : 'white' }}>{balance.remaining} days</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ fontSize: '3rem', opacity: 0.3 }}>🏖️</div>
+                    </div>
+                </div>
+            )}
 
             <div className="card">
                 {leaves.length === 0 ? (

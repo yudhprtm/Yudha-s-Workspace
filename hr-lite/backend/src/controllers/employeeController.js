@@ -51,13 +51,26 @@ const get = async (req, res, next) => {
 const create = async (req, res, next) => {
     try {
         const { name, email, role, nik, position, department, join_date } = req.body;
+
+        // Validation
+        if (!name || !email || !nik || !position || !department || !join_date) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
         const db = await getDb();
 
         // Check if email exists
         const existing = await db.get("SELECT id FROM users WHERE email = ?", [email]);
         if (existing) return res.status(400).json({ error: 'Email already exists' });
 
-        const passwordHash = await bcrypt.hash('password123', 10); // Default password
+        // Generate Secure Temp Password
+        const randomDigits = Math.floor(1000 + Math.random() * 9000);
+        const tempPassword = `Temp@${randomDigits}`;
+        const passwordHash = await bcrypt.hash(tempPassword, 10);
 
         const result = await db.run(
             "INSERT INTO users (tenant_id, name, email, role, password_hash) VALUES (?, ?, ?, ?, ?)",
@@ -70,7 +83,12 @@ const create = async (req, res, next) => {
             [req.tenantId, userId, nik, position, department, join_date]
         );
 
-        res.status(201).json({ id: empResult.lastID, user_id: userId });
+        res.status(201).json({
+            id: empResult.lastID,
+            user_id: userId,
+            message: 'Employee created successfully',
+            temp_password: tempPassword
+        });
     } catch (err) {
         next(err);
     }

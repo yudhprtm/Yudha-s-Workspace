@@ -4,6 +4,18 @@ const { createNotification, logApproval } = require('../services/approvalService
 const requestLeave = async (req, res, next) => {
     try {
         const { type, start_date, end_date, days, reason } = req.body;
+
+        // Validation
+        if (!type || !start_date || !end_date || !days || !reason) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+        if (isNaN(days) || days <= 0) {
+            return res.status(400).json({ error: 'Days must be a positive number' });
+        }
+        if (new Date(start_date) > new Date(end_date)) {
+            return res.status(400).json({ error: 'Start date cannot be after end date' });
+        }
+
         const db = await getDb();
         const userId = req.user.id;
 
@@ -55,6 +67,22 @@ const updateStatus = async (req, res, next) => {
 
         if (leave.status !== 'pending') {
             return res.status(400).json({ error: 'Leave request is already processed' });
+        }
+
+        // Balance Check (only for approval)
+        if (status === 'approved') {
+            const currentYear = new Date().getFullYear().toString();
+            const usedResult = await db.get(
+                `SELECT SUM(days) as used FROM leave_requests 
+                 WHERE employee_id = ? AND status = 'approved' AND strftime('%Y', start_date) = ?`,
+                [leave.employee_id, currentYear]
+            );
+            const used = usedResult.used || 0;
+            const allowance = 12; // Hardcoded annual allowance
+
+            if (used + leave.days > allowance) {
+                return res.status(400).json({ error: `Insufficient leave balance. Used: ${used}, Requested: ${leave.days}, Allowance: ${allowance}` });
+            }
         }
 
         await db.run(
@@ -129,4 +157,33 @@ const reject = (req, res, next) => {
     updateStatus(req, res, next);
 };
 
-module.exports = { requestLeave, updateStatus, list, approve, reject };
+const getBalance = async (req, res, next) => {
+    try {
+        const db = await getDb();
+        const userId = req.user.id;
+
+        const employee = await db.get("SELECT id FROM employees WHERE user_id = ?", [userId]);
+        if (!employee) return res.status(404).json({ error: 'Employee not found' });
+
+        const currentYear = new Date().getFullYear().toString();
+        const usedResult = await db.get(
+            `SELECT SUM(days) as used FROM leave_requests 
+             WHERE employee_id = ? AND status = 'approved' AND strftime('%Y', start_date) = ?`,
+            [employee.id, currentYear]
+        );
+        const used = usedResult.used || 0;
+        const allowance = 12;
+        const remaining = allowance - used;
+
+        res.json({
+            allowance,
+            used,
+            remaining,
+            year: currentYear
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+module.exports = { requestLeave, updateStatus, list, approve, reject, getBalance };

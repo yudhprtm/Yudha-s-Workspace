@@ -1,7 +1,7 @@
 {
-    "name": "hr-lite-backend",
+    "name": "attendify-backend",
     "version": "1.0.0",
-    "description": "Backend for HR Lite Multi-Tenant",
+    "description": "Backend for Attendify Multi-Tenant HR Application",
     "main": "app.js",
     "scripts": {
         "start": "node app.js",

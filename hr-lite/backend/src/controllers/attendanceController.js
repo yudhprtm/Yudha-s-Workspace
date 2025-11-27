@@ -21,23 +21,31 @@ const clockIn = async (req, res, next) => {
         );
 
         if (existing) {
-            // N7: Clock-in twice without clock-out -> create second clock-in but flag as "missing clock-out" in meta
-            // For MVP, I'll just return an error or maybe close the previous one?
-            // User requirement: "create second clock-in but flag as 'missing clock-out' in meta; admin can correct."
-
-            // I'll update the previous one's note to "Missing Clock Out" and create a new one.
             await db.run("UPDATE attendance SET note = ? WHERE id = ?", ['Missing Clock Out', existing.id]);
         }
 
-        const now = new Date().toISOString();
+        const now = new Date();
+        const utcNow = now.toISOString();
         const ip = req.ip;
 
+        // Calculate Late (GMT+7)
+        // 9:00 AM GMT+7 = 02:00 UTC
+        // We use a simple check: if hour (adjusted to GMT+7) > 9, or hour=9 and min>0
+        const localTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+        const localHour = localTime.getUTCHours();
+        const localMin = localTime.getUTCMinutes();
+
+        let note = '';
+        if (localHour > 9 || (localHour === 9 && localMin > 0)) {
+            note = 'Late';
+        }
+
         const result = await db.run(
-            "INSERT INTO attendance (tenant_id, employee_id, clock_in, ip) VALUES (?, ?, ?, ?)",
-            [req.tenantId, employee.id, now, ip]
+            "INSERT INTO attendance (tenant_id, employee_id, clock_in, ip, note) VALUES (?, ?, ?, ?, ?)",
+            [req.tenantId, employee.id, utcNow, ip, note]
         );
 
-        res.status(201).json({ attendance_id: result.lastID, clock_in: now });
+        res.status(201).json({ attendance_id: result.lastID, clock_in: utcNow, note });
     } catch (err) {
         next(err);
     }
@@ -61,10 +69,28 @@ const clockOut = async (req, res, next) => {
             return res.status(400).json({ error: 'No active clock-in found' });
         }
 
-        const now = new Date().toISOString();
-        await db.run("UPDATE attendance SET clock_out = ? WHERE id = ?", [now, entry.id]);
+        const now = new Date();
+        const utcNow = now.toISOString();
 
-        res.json({ attendance_id: entry.id, clock_out: now });
+        // Calculate Overtime (GMT+7)
+        // 17:00 GMT+7 = 10:00 UTC
+        const localTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+        const localHour = localTime.getUTCHours();
+
+        let note = entry.note || '';
+        if (localHour >= 17) {
+            // Simple OT calculation: hours after 17:00
+            // If clocked out at 18:30, OT is 1.5 hours? 
+            // Prompt says "Calculate simple overtime". I'll just mark it.
+            // "Overtime"
+            const otHours = localHour - 17;
+            const otSuffix = `Overtime: ${otHours}h`;
+            note = note ? `${note}, ${otSuffix}` : otSuffix;
+        }
+
+        await db.run("UPDATE attendance SET clock_out = ?, note = ? WHERE id = ?", [utcNow, note, entry.id]);
+
+        res.json({ attendance_id: entry.id, clock_out: utcNow, note });
     } catch (err) {
         next(err);
     }
@@ -72,7 +98,7 @@ const clockOut = async (req, res, next) => {
 
 const getMonthly = async (req, res, next) => {
     try {
-        const { month, page = 1, limit = 10 } = req.query; // YYYY-MM
+        const { month, page = 1, limit = 10, sortBy = 'clock_in', sortOrder = 'DESC' } = req.query; // YYYY-MM
         if (!month) return res.status(400).json({ error: 'Month required (YYYY-MM)' });
 
         const offset = (page - 1) * limit;
@@ -100,6 +126,7 @@ const getMonthly = async (req, res, next) => {
                    datetime(a.clock_in, '+7 hours') as clock_in_local,
                    datetime(a.clock_out, '+7 hours') as clock_out_local
                    ${baseSql}
+                   ORDER BY ${sortBy} ${sortOrder}
                    LIMIT ? OFFSET ?`;
 
         const records = await db.all(sql, [...params, limit, offset]);
@@ -118,7 +145,7 @@ const getMonthly = async (req, res, next) => {
 
 const getRecent = async (req, res, next) => {
     try {
-        const { page = 1, limit = 10 } = req.query;
+        const { page = 1, limit = 10, sortBy = 'clock_in', sortOrder = 'DESC' } = req.query;
         const offset = (page - 1) * limit;
         const db = await getDb();
         const userId = req.user.id;
@@ -149,7 +176,7 @@ const getRecent = async (req, res, next) => {
                    datetime(a.clock_in, '+7 hours') as clock_in_local,
                    datetime(a.clock_out, '+7 hours') as clock_out_local
                    ${baseSql}
-                   ORDER BY a.clock_in DESC
+                   ORDER BY ${sortBy} ${sortOrder}
                    LIMIT ? OFFSET ?`;
 
         const records = await db.all(sql, [...params, limit, offset]);

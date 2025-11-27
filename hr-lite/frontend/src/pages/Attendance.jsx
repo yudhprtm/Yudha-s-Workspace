@@ -7,6 +7,7 @@ const Attendance = () => {
     const [logs, setLogs] = useState([]);
     const [corrections, setCorrections] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
     const user = JSON.parse(atob(localStorage.getItem('token').split('.')[1]));
     const tenantId = user.tenantId;
     const { addToast } = useToast();
@@ -23,16 +24,19 @@ const Attendance = () => {
         reason: ''
     });
 
-    // Pagination State
+    // Pagination & Sorting State
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(0);
+    const [sortBy, setSortBy] = useState('clock_in');
+    const [sortOrder, setSortOrder] = useState('DESC');
+
     const [correctionsPage, setCorrectionsPage] = useState(1);
     const [correctionsTotalPages, setCorrectionsTotalPages] = useState(0);
     const limit = 10;
 
     useEffect(() => {
         fetchAttendance();
-    }, [currentPage]);
+    }, [currentPage, sortBy, sortOrder]);
 
     useEffect(() => {
         if (['ADMIN', 'HR', 'MANAGER'].includes(user.role)) {
@@ -42,7 +46,7 @@ const Attendance = () => {
 
     const fetchAttendance = async () => {
         try {
-            const { data } = await api.get(`/api/${tenantId}/attendance?page=${currentPage}&limit=${limit}`);
+            const { data } = await api.get(`/api/${tenantId}/attendance?page=${currentPage}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}`);
             setLogs(data.data);
             setTotalPages(data.totalPages);
         } catch (err) {
@@ -62,7 +66,17 @@ const Attendance = () => {
         }
     };
 
+    const handleSort = (field) => {
+        if (sortBy === field) {
+            setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+        } else {
+            setSortBy(field);
+            setSortOrder('ASC');
+        }
+    };
+
     const handleClockIn = async () => {
+        setActionLoading(true);
         try {
             console.log(`Clocking in for tenant: ${tenantId}`);
             await api.post(`/api/${tenantId}/attendance/clock-in`);
@@ -71,31 +85,42 @@ const Attendance = () => {
         } catch (err) {
             console.error('Clock in error:', err);
             addToast(err.response?.data?.error || 'Clock in failed', 'error');
+        } finally {
+            setActionLoading(false);
         }
     };
 
     const handleClockOut = async () => {
+        setActionLoading(true);
         try {
             await api.post(`/api/${tenantId}/attendance/clock-out`);
             addToast('Clocked out successfully', 'success');
             fetchAttendance();
         } catch (err) {
             addToast(err.response?.data?.error || 'Clock out failed', 'error');
+        } finally {
+            setActionLoading(false);
         }
     };
 
     const handleCorrectionSubmit = async (e) => {
         e.preventDefault();
+        setActionLoading(true);
         try {
             await api.post(`/api/${tenantId}/attendance/corrections`, formData);
             addToast('Correction requested', 'success');
             setShowModal(false);
         } catch (err) {
             addToast('Request failed', 'error');
+        } finally {
+            setActionLoading(false);
         }
     };
 
     const handleCorrectionStatus = async (id, status) => {
+        if (!window.confirm(`Are you sure you want to ${status} this correction?`)) return;
+
+        setActionLoading(true);
         try {
             await api.patch(`/api/${tenantId}/attendance/corrections/${id}/${status}`);
             addToast(`Correction ${status}d`, 'success');
@@ -103,6 +128,8 @@ const Attendance = () => {
             fetchCorrections();
         } catch (err) {
             addToast('Action failed', 'error');
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -156,8 +183,12 @@ const Attendance = () => {
                 <h1>Attendance</h1>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button onClick={openCorrectionModal} className="btn" style={{ background: '#334155', color: 'white' }}>Request Correction</button>
-                    <button onClick={handleClockIn} className="btn btn-primary">Clock In</button>
-                    <button onClick={handleClockOut} className="btn" style={{ backgroundColor: '#ef4444', color: 'white' }}>Clock Out</button>
+                    <button onClick={handleClockIn} disabled={actionLoading} className="btn btn-primary">
+                        {actionLoading ? '...' : 'Clock In'}
+                    </button>
+                    <button onClick={handleClockOut} disabled={actionLoading} className="btn" style={{ backgroundColor: '#ef4444', color: 'white' }}>
+                        {actionLoading ? '...' : 'Clock Out'}
+                    </button>
                 </div>
             </div>
 
@@ -198,8 +229,8 @@ const Attendance = () => {
                 <table>
                     <thead>
                         <tr>
-                            <th>Employee</th>
-                            <th>Date</th>
+                            <th onClick={() => handleSort('name')} style={{ cursor: 'pointer' }}>Employee {sortBy === 'name' && (sortOrder === 'ASC' ? '↑' : '↓')}</th>
+                            <th onClick={() => handleSort('clock_in')} style={{ cursor: 'pointer' }}>Date {sortBy === 'clock_in' && (sortOrder === 'ASC' ? '↑' : '↓')}</th>
                             <th>Clock In</th>
                             <th>Clock Out</th>
                             <th>Note</th>
@@ -302,7 +333,9 @@ const Attendance = () => {
                                     </div>
                                     <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                                         <button type="button" onClick={() => setShowModal(false)} className="btn">Cancel</button>
-                                        <button type="submit" className="btn btn-primary">Submit Request</button>
+                                        <button type="submit" disabled={actionLoading} className="btn btn-primary">
+                                            {actionLoading ? 'Submitting...' : 'Submit Request'}
+                                        </button>
                                     </div>
                                 </form>
                             </div>
@@ -325,7 +358,7 @@ const Attendance = () => {
                             </div>
                             <div>
                                 <label>Request Date</label>
-                                <div>{selectedCorrection.created_at ? new Date(selectedCorrection.created_at).toLocaleDateString() : 'N/A'}</div>
+                                <div style={{ fontWeight: '600' }}>{selectedCorrection.date}</div>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'var(--bg-hover)', padding: '10px', borderRadius: '8px' }}>
                                 <div>
@@ -343,17 +376,15 @@ const Attendance = () => {
                                 <label>Reason</label>
                                 <div style={{ padding: '10px', background: 'var(--bg-input)', borderRadius: '4px', fontStyle: 'italic' }}>{selectedCorrection.reason}</div>
                             </div>
-                            {selectedCorrection.evidence && (
-                                <div>
-                                    <label>Evidence</label>
-                                    <div><a href={selectedCorrection.evidence} target="_blank" rel="noopener noreferrer">View Attachment</a></div>
-                                </div>
-                            )}
                         </div>
                         <div style={{ marginTop: '25px', display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid var(--border)', paddingTop: '15px' }}>
                             <button onClick={() => setShowApprovalModal(false)} className="btn">Close</button>
-                            <button onClick={() => handleCorrectionStatus(selectedCorrection.id, 'reject')} className="btn" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>Reject</button>
-                            <button onClick={() => handleCorrectionStatus(selectedCorrection.id, 'approve')} className="btn btn-primary">Confirm Approve</button>
+                            <button onClick={() => handleCorrectionStatus(selectedCorrection.id, 'reject')} disabled={actionLoading} className="btn" style={{ background: 'var(--danger-bg)', color: 'var(--danger)' }}>
+                                {actionLoading ? '...' : 'Reject'}
+                            </button>
+                            <button onClick={() => handleCorrectionStatus(selectedCorrection.id, 'approve')} disabled={actionLoading} className="btn btn-primary">
+                                {actionLoading ? '...' : 'Confirm Approve'}
+                            </button>
                         </div>
                     </div>
                 </div>
