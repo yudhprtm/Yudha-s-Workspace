@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { getDb } = require('../services/db');
+const rateLimiter = require('../middleware/rateLimiter');
 
 const generateTokens = (user) => {
     const payload = {
@@ -19,23 +20,37 @@ const generateTokens = (user) => {
 const login = async (req, res, next) => {
     try {
         const { email, password } = req.body;
-        const db = await getDb();
+        const identifier = req.ip || email;
 
+        // Check rate limit
+        if (rateLimiter.isBlocked(identifier)) {
+            const remainingTime = rateLimiter.getBlockedTime(identifier);
+            return res.status(429).json({
+                error: 'Too many failed login attempts',
+                retryAfter: remainingTime
+            });
+        }
+
+        const db = await getDb();
         const user = await db.get("SELECT * FROM users WHERE email = ?", [email]);
 
         if (!user) {
-            // N1: Invalid credentials -> 401 Unauthorized with generic message
+            rateLimiter.recordAttempt(identifier);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
         const isValid = await bcrypt.compare(password, user.password_hash);
         if (!isValid) {
+            rateLimiter.recordAttempt(identifier);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
         if (user.status !== 'active') {
             return res.status(403).json({ error: 'Account inactive' });
         }
+
+        // Reset rate limit on successful login
+        rateLimiter.reset(identifier);
 
         const tokens = generateTokens(user);
         res.json(tokens);
