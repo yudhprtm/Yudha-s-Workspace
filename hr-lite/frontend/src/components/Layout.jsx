@@ -129,7 +129,8 @@ const Layout = ({ children }) => {
 
                     <div style={{ padding: '15px', background: 'var(--bg-hover)', borderRadius: '12px', marginBottom: '15px' }}>
                         <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-main)' }}>{user.email.split('@')[0]}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{user.role.toLowerCase()}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize', marginBottom: '8px' }}>{user.role.toLowerCase()}</div>
+                        <Link to="/change-password" onClick={closeSidebar} style={{ fontSize: '0.8rem', color: 'var(--primary)', textDecoration: 'none' }}>Change Password</Link>
                     </div>
                     <button onClick={logout} className="logout-btn">
                         Sign Out

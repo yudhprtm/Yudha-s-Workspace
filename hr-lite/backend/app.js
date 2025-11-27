@@ -31,6 +31,7 @@ app.use('/api/:tenant/attendance', attendanceRoutes);
 app.use('/api/:tenant/leave', leaveRoutes);
 app.use('/api/:tenant/payroll', payrollRoutes);
 app.use('/api/:tenant/notifications', notificationRoutes);
+app.use('/api', require('./src/routes/password'));
 
 const PORT = process.env.PORT || 3000;
 

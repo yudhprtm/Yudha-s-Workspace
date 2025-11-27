@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import ChangePassword from './pages/ChangePassword';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Attendance from './pages/Attendance';
@@ -21,6 +23,7 @@ function App() {
             <ToastProvider>
                 <Routes>
                     <Route path="/login" element={<Login />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route element={<PrivateRoute />}>
                         <Route path="/" element={<Navigate to="/dashboard" />} />
                         <Route path="/dashboard" element={<Dashboard />} />
@@ -29,6 +32,7 @@ function App() {
                         <Route path="/leave" element={<Leave />} />
                         <Route path="/payroll" element={<Payroll />} />
                         <Route path="/admin" element={<Admin />} />
+                        <Route path="/change-password" element={<ChangePassword />} />
                     </Route>
                 </Routes>
             </ToastProvider>
